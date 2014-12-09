@@ -1,0 +1,2034 @@
+
+optiboot_miniwireless.elf:     file format elf32-avr
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text         00000760  00007800  00007800  00000074  2**1
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  1 .version      00000002  00007ffe  00007ffe  000007d4  2**0
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  2 .debug_aranges 00000028  00000000  00000000  000007d6  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  3 .debug_pubnames 000000e4  00000000  00000000  000007fe  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  4 .debug_info   00000a4a  00000000  00000000  000008e2  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  5 .debug_abbrev 0000027e  00000000  00000000  0000132c  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  6 .debug_line   00000d38  00000000  00000000  000015aa  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  7 .debug_frame  000000f0  00000000  00000000  000022e4  2**2
+                  CONTENTS, READONLY, DEBUGGING
+  8 .debug_str    0000024f  00000000  00000000  000023d4  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  9 .debug_loc    000006ae  00000000  00000000  00002623  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 10 .debug_ranges 00000120  00000000  00000000  00002cd1  2**0
+                  CONTENTS, READONLY, DEBUGGING
+
+Disassembly of section .text:
+
+00007800 <main>:
+#else
+void CheckFlashImage() {}
+#endif
+
+/* main program starts here */
+int main(void) {
+    7800:	8f e0       	ldi	r24, 0x0F	; 15
+    7802:	d2 d1       	rcall	.+932    	; 0x7ba8 <watchdogConfig>
+  //  SP points to RAMEND
+  //  r1 contains zero
+  //
+  // If not, uncomment the following instructions:
+  // cli();
+  asm volatile ("clr __zero_reg__");
+    7804:	11 24       	eor	r1, r1
+   * modified Adaboot no-wait mod.
+   * Pass the reset reason to app.  Also, it appears that an Uno poweron
+   * can leave multiple reset flags set; we only want the bootloader to
+   * run on an 'external reset only' status
+   */
+  ch = MCUSR;
+    7806:	14 b7       	in	r17, 0x34	; 52
+  MCUSR = 0;
+    7808:	14 be       	out	0x34, r1	; 52
+//ORIG.OPTIBOOT  if (ch & (_BV(WDRF) | _BV(BORF) | _BV(PORF)))
+//ORIG.OPTIBOOT      appStart(ch);
+
+#ifdef DEBUG_ON  
+    putch('S');
+    780a:	83 e5       	ldi	r24, 0x53	; 83
+    780c:	52 d1       	rcall	.+676    	; 0x7ab2 <putch>
+#endif
+
+//      CheckFlashImage();
+	  
+  if (!(ch & _BV(EXTRF))) //if not external reset
+    780e:	11 fd       	sbrc	r17, 1
+    7810:	0d c0       	rjmp	.+26     	; 0x782c <main+0x2c>
+  {
+#ifdef DEBUG_ON
+	  putch('T');
+    7812:	84 e5       	ldi	r24, 0x54	; 84
+    7814:	4e d1       	rcall	.+668    	; 0x7ab2 <putch>
+#endif
+    if (ch & _BV(WDRF)) //if reset by watchdog
+    7816:	13 ff       	sbrs	r17, 3
+    7818:	05 c0       	rjmp	.+10     	; 0x7824 <main+0x24>
+	{
+#ifdef DEBUG_ON
+	  putch('Y');
+    781a:	89 e5       	ldi	r24, 0x59	; 89
+    781c:	4a d1       	rcall	.+660    	; 0x7ab2 <putch>
+#endif
+      CheckFlashImage();
+    781e:	da d1       	rcall	.+948    	; 0x7bd4 <CheckFlashImage>
+#ifdef DEBUG_ON
+	  putch('Z');
+    7820:	8a e5       	ldi	r24, 0x5A	; 90
+    7822:	47 d1       	rcall	.+654    	; 0x7ab2 <putch>
+#endif
+	}
+#ifdef DEBUG_ON
+    putch('A');
+    7824:	81 e4       	ldi	r24, 0x41	; 65
+    7826:	45 d1       	rcall	.+650    	; 0x7ab2 <putch>
+#endif
+    appStart(ch);
+    7828:	81 2f       	mov	r24, r17
+    782a:	94 d3       	rcall	.+1832   	; 0x7f54 <appStart>
+  }
+
+#if LED_START_FLASHES > 0
+  // Set up Timer 1 for timeout counter
+  TCCR1B = _BV(CS12) | _BV(CS10); // div 1024
+    782c:	85 e0       	ldi	r24, 0x05	; 5
+    782e:	80 93 81 00 	sts	0x0081, r24
+  UCSRA = _BV(U2X); //Double speed mode USART
+  UCSRB = _BV(RXEN) | _BV(TXEN);  // enable Rx & Tx
+  UCSRC = _BV(URSEL) | _BV(UCSZ1) | _BV(UCSZ0);  // config USART; 8N1
+  UBRRL = (uint8_t)( (F_CPU + BAUD_RATE * 4L) / (BAUD_RATE * 8L) - 1 );
+#else
+  UART_SRA = _BV(U2X0); //Double speed mode USART0
+    7832:	82 e0       	ldi	r24, 0x02	; 2
+    7834:	80 93 c0 00 	sts	0x00C0, r24
+  UART_SRB = _BV(RXEN0) | _BV(TXEN0);
+    7838:	88 e1       	ldi	r24, 0x18	; 24
+    783a:	80 93 c1 00 	sts	0x00C1, r24
+  UART_SRC = _BV(UCSZ00) | _BV(UCSZ01);
+    783e:	86 e0       	ldi	r24, 0x06	; 6
+    7840:	80 93 c2 00 	sts	0x00C2, r24
+  UART_SRL = (uint8_t)( (F_CPU + BAUD_RATE * 4L) / (BAUD_RATE * 8L) - 1 );
+    7844:	80 e1       	ldi	r24, 0x10	; 16
+    7846:	80 93 c4 00 	sts	0x00C4, r24
+#endif
+#endif
+
+  // Set up watchdog to trigger after 500ms
+  watchdogConfig(WATCHDOG_1S);
+    784a:	8e e0       	ldi	r24, 0x0E	; 14
+    784c:	ad d1       	rcall	.+858    	; 0x7ba8 <watchdogConfig>
+
+#if (LED_START_FLASHES > 0) || defined(LED_DATA_FLASH)
+  /* Set LED pin as output */
+  LED_DDR |= _BV(LED);
+    784e:	21 9a       	sbi	0x04, 1	; 4
+    7850:	86 e0       	ldi	r24, 0x06	; 6
+}
+
+#if LED_START_FLASHES > 0
+void flash_led(uint8_t count) {
+  do {
+    TCNT1 = -(F_CPU/(1024*16));
+    7852:	20 e3       	ldi	r18, 0x30	; 48
+    7854:	3c ef       	ldi	r19, 0xFC	; 252
+    TIFR1 = _BV(TOV1);
+    7856:	91 e0       	ldi	r25, 0x01	; 1
+}
+
+#if LED_START_FLASHES > 0
+void flash_led(uint8_t count) {
+  do {
+    TCNT1 = -(F_CPU/(1024*16));
+    7858:	30 93 85 00 	sts	0x0085, r19
+    785c:	20 93 84 00 	sts	0x0084, r18
+    TIFR1 = _BV(TOV1);
+    7860:	96 bb       	out	0x16, r25	; 22
+    while(!(TIFR1 & _BV(TOV1)));
+    7862:	b0 9b       	sbis	0x16, 0	; 22
+    7864:	fe cf       	rjmp	.-4      	; 0x7862 <main+0x62>
+#if defined(__AVR_ATmega8__)  || defined (__AVR_ATmega32__)
+    LED_PORT ^= _BV(LED);
+#else
+    LED_PIN |= _BV(LED);
+    7866:	19 9a       	sbi	0x03, 1	; 3
+}
+#endif
+
+// Watchdog functions. These are only safe with interrupts turned off.
+void watchdogReset() {
+  __asm__ __volatile__ (
+    7868:	a8 95       	wdr
+    LED_PORT ^= _BV(LED);
+#else
+    LED_PIN |= _BV(LED);
+#endif
+    watchdogReset();
+  } while (--count);
+    786a:	81 50       	subi	r24, 0x01	; 1
+    786c:	a9 f7       	brne	.-22     	; 0x7858 <main+0x58>
+  /* Flash onboard LED to signal entering of bootloader */
+  flash_led(LED_START_FLASHES * 2);
+#endif
+
+
+puthex(0x20);puthex(0xDE);puthex(0xAD);puthex(0xBE);puthex(0xEF);
+    786e:	80 e2       	ldi	r24, 0x20	; 32
+    7870:	77 d1       	rcall	.+750    	; 0x7b60 <puthex>
+    7872:	8e ed       	ldi	r24, 0xDE	; 222
+    7874:	75 d1       	rcall	.+746    	; 0x7b60 <puthex>
+    7876:	8d ea       	ldi	r24, 0xAD	; 173
+    7878:	73 d1       	rcall	.+742    	; 0x7b60 <puthex>
+    787a:	8e eb       	ldi	r24, 0xBE	; 190
+    787c:	71 d1       	rcall	.+738    	; 0x7b60 <puthex>
+    787e:	8f ee       	ldi	r24, 0xEF	; 239
+    7880:	6f d1       	rcall	.+734    	; 0x7b60 <puthex>
+    7882:	ee 24       	eor	r14, r14
+    7884:	ff 24       	eor	r15, r15
+	     * Start the page erase and wait for it to finish.  There
+	     * used to be code to do this while receiving the data over
+	     * the serial link, but the performance improvement was slight,
+	     * and we needed the space back.
+	     */
+	    __boot_page_erase_short((uint16_t)(void*)address);
+    7886:	83 e0       	ldi	r24, 0x03	; 3
+    7888:	b8 2e       	mov	r11, r24
+	     */
+	    do {
+		uint16_t a;
+		a = *bufPtr++;
+		a |= (*bufPtr++) << 8;
+		__boot_page_fill_short((uint16_t)(void*)addrPtr,a);
+    788a:	aa 24       	eor	r10, r10
+    788c:	a3 94       	inc	r10
+	    } while (len -= 2);
+
+	    /*
+	     * Actually Write the buffer to flash (and wait for it to finish.)
+	     */
+	    __boot_page_write_short((uint16_t)(void*)address);
+    788e:	05 e0       	ldi	r16, 0x05	; 5
+    7890:	d0 2e       	mov	r13, r16
+	    boot_spm_busy_wait();
+#if defined(RWWSRE)
+	    // Reenable read access to flash
+	    boot_rww_enable();
+    7892:	11 e1       	ldi	r17, 0x11	; 17
+    7894:	c1 2e       	mov	r12, r17
+puthex(0x20);puthex(0xDE);puthex(0xAD);puthex(0xBE);puthex(0xEF);
+
+  /* Forever loop: exits by causing WDT reset */
+  for (;;) {
+    /* get character from UART */
+    ch = getch();
+    7896:	7c d1       	rcall	.+760    	; 0x7b90 <getch>
+
+    if(ch == STK_GET_PARAMETER) {
+    7898:	81 34       	cpi	r24, 0x41	; 65
+    789a:	71 f4       	brne	.+28     	; 0x78b8 <main+0xb8>
+      unsigned char which = getch();
+    789c:	79 d1       	rcall	.+754    	; 0x7b90 <getch>
+    789e:	18 2f       	mov	r17, r24
+      verifySpace();
+    78a0:	89 d1       	rcall	.+786    	; 0x7bb4 <verifySpace>
+      /*
+       * Send optiboot version as "SW version"
+       * Note that the references to memory are optimized away.
+       */
+      if (which == 0x82) {
+    78a2:	12 38       	cpi	r17, 0x82	; 130
+    78a4:	11 f4       	brne	.+4      	; 0x78aa <main+0xaa>
+	  putch(optiboot_version & 0xFF);
+    78a6:	82 e0       	ldi	r24, 0x02	; 2
+    78a8:	05 c0       	rjmp	.+10     	; 0x78b4 <main+0xb4>
+      } else if (which == 0x81) {
+    78aa:	11 38       	cpi	r17, 0x81	; 129
+    78ac:	11 f4       	brne	.+4      	; 0x78b2 <main+0xb2>
+	  putch(optiboot_version >> 8);
+    78ae:	8a e1       	ldi	r24, 0x1A	; 26
+    78b0:	01 c0       	rjmp	.+2      	; 0x78b4 <main+0xb4>
+      } else {
+	/*
+	 * GET PARAMETER returns a generic 0x03 reply for
+         * other parameters - enough to keep Avrdude happy
+	 */
+	putch(0x03);
+    78b2:	83 e0       	ldi	r24, 0x03	; 3
+    78b4:	fe d0       	rcall	.+508    	; 0x7ab2 <putch>
+    78b6:	9c c0       	rjmp	.+312    	; 0x79f0 <main+0x1f0>
+      }
+    }
+    else if(ch == STK_SET_DEVICE) {
+    78b8:	82 34       	cpi	r24, 0x42	; 66
+    78ba:	11 f4       	brne	.+4      	; 0x78c0 <main+0xc0>
+      // SET DEVICE is ignored
+      getNch(20);
+    78bc:	84 e1       	ldi	r24, 0x14	; 20
+    78be:	03 c0       	rjmp	.+6      	; 0x78c6 <main+0xc6>
+    }
+    else if(ch == STK_SET_DEVICE_EXT) {
+    78c0:	85 34       	cpi	r24, 0x45	; 69
+    78c2:	19 f4       	brne	.+6      	; 0x78ca <main+0xca>
+      // SET DEVICE EXT is ignored
+      getNch(5);
+    78c4:	85 e0       	ldi	r24, 0x05	; 5
+    78c6:	7e d1       	rcall	.+764    	; 0x7bc4 <getNch>
+    78c8:	93 c0       	rjmp	.+294    	; 0x79f0 <main+0x1f0>
+    }
+    else if(ch == STK_LOAD_ADDRESS) {
+    78ca:	85 35       	cpi	r24, 0x55	; 85
+    78cc:	79 f4       	brne	.+30     	; 0x78ec <main+0xec>
+      // LOAD ADDRESS
+      uint16_t newAddress;
+      newAddress = getch();
+    78ce:	60 d1       	rcall	.+704    	; 0x7b90 <getch>
+      newAddress = (newAddress & 0xff) | (getch() << 8);
+    78d0:	e8 2e       	mov	r14, r24
+    78d2:	ff 24       	eor	r15, r15
+    78d4:	5d d1       	rcall	.+698    	; 0x7b90 <getch>
+    78d6:	08 2f       	mov	r16, r24
+    78d8:	10 e0       	ldi	r17, 0x00	; 0
+    78da:	10 2f       	mov	r17, r16
+    78dc:	00 27       	eor	r16, r16
+    78de:	0e 29       	or	r16, r14
+    78e0:	1f 29       	or	r17, r15
+#ifdef RAMPZ
+      // Transfer top bit to RAMPZ
+      RAMPZ = (newAddress & 0x8000) ? 1 : 0;
+#endif
+      newAddress += newAddress; // Convert from word address to byte address
+    78e2:	00 0f       	add	r16, r16
+    78e4:	11 1f       	adc	r17, r17
+      address = newAddress;
+      verifySpace();
+    78e6:	66 d1       	rcall	.+716    	; 0x7bb4 <verifySpace>
+    78e8:	78 01       	movw	r14, r16
+    78ea:	82 c0       	rjmp	.+260    	; 0x79f0 <main+0x1f0>
+    }
+    else if(ch == STK_UNIVERSAL) {
+    78ec:	86 35       	cpi	r24, 0x56	; 86
+    78ee:	21 f4       	brne	.+8      	; 0x78f8 <main+0xf8>
+      // UNIVERSAL command is ignored
+      getNch(4);
+    78f0:	84 e0       	ldi	r24, 0x04	; 4
+    78f2:	68 d1       	rcall	.+720    	; 0x7bc4 <getNch>
+      putch(0x00);
+    78f4:	80 e0       	ldi	r24, 0x00	; 0
+    78f6:	de cf       	rjmp	.-68     	; 0x78b4 <main+0xb4>
+    }
+    /* Write memory, length is big endian and is in bytes */
+    else if(ch == STK_PROG_PAGE) {
+    78f8:	84 36       	cpi	r24, 0x64	; 100
+    78fa:	09 f0       	breq	.+2      	; 0x78fe <main+0xfe>
+    78fc:	4b c0       	rjmp	.+150    	; 0x7994 <main+0x194>
+      // PROGRAM PAGE - we support flash programming only, not EEPROM
+      uint8_t desttype;
+      uint8_t *bufPtr;
+      pagelen_t savelength;
+
+      GETLENGTH(length);
+    78fe:	48 d1       	rcall	.+656    	; 0x7b90 <getch>
+    7900:	47 d1       	rcall	.+654    	; 0x7b90 <getch>
+    7902:	08 2f       	mov	r16, r24
+      savelength = length;
+      desttype = getch();
+    7904:	45 d1       	rcall	.+650    	; 0x7b90 <getch>
+    7906:	18 2f       	mov	r17, r24
+    7908:	c0 e0       	ldi	r28, 0x00	; 0
+    790a:	d1 e0       	ldi	r29, 0x01	; 1
+
+      // read a page worth of contents
+      bufPtr = buff;
+      do *bufPtr++ = getch();
+    790c:	41 d1       	rcall	.+642    	; 0x7b90 <getch>
+    790e:	89 93       	st	Y+, r24
+      while (--length);
+    7910:	0c 17       	cp	r16, r28
+    7912:	e1 f7       	brne	.-8      	; 0x790c <main+0x10c>
+
+      // Read command terminator, start reply
+      verifySpace();
+    7914:	4f d1       	rcall	.+670    	; 0x7bb4 <verifySpace>
+ * void writebuffer(memtype, buffer, address, length)
+ */
+static inline void writebuffer(int8_t memtype, uint8_t *mybuff,
+			       uint16_t address, pagelen_t len)
+{
+    switch (memtype) {
+    7916:	15 34       	cpi	r17, 0x45	; 69
+    7918:	b9 f4       	brne	.+46     	; 0x7948 <main+0x148>
+    791a:	97 01       	movw	r18, r14
+    791c:	e0 e0       	ldi	r30, 0x00	; 0
+    791e:	f1 e0       	ldi	r31, 0x01	; 1
+    7920:	10 c0       	rjmp	.+32     	; 0x7942 <main+0x142>
+    case 'E': // EEPROM
+#if defined(SUPPORT_EEPROM) || defined(BIGBOOT)
+        while(len--) {
+	    eeprom_write_byte((uint8_t *)(address++), *mybuff++);
+    7922:	40 81       	ld	r20, Z
+/** \ingroup avr_eeprom
+    Write a byte \a __value to EEPROM address \a __p.
+ */
+static __inline__ void eeprom_write_byte (uint8_t *__p, uint8_t __value)
+{
+    do {} while (!eeprom_is_ready ());
+    7924:	f9 99       	sbic	0x1f, 1	; 31
+    7926:	fe cf       	rjmp	.-4      	; 0x7924 <main+0x124>
+    7928:	c9 01       	movw	r24, r18
+    792a:	01 96       	adiw	r24, 0x01	; 1
+    792c:	31 96       	adiw	r30, 0x01	; 1
+
+#if	defined(EEPM0) && defined(EEPM1)
+    EECR = 0;		/* Set programming mode: erase and write.	*/
+    792e:	1f ba       	out	0x1f, r1	; 31
+#endif
+
+#if	E2END <= 0xFF
+    EEARL = (unsigned)__p;
+#else
+    EEAR = (unsigned)__p;
+    7930:	32 bd       	out	0x22, r19	; 34
+    7932:	21 bd       	out	0x21, r18	; 33
+#endif
+    EEDR = __value;
+    7934:	40 bd       	out	0x20, r20	; 32
+
+    __asm__ __volatile__ (
+    7936:	0f b6       	in	r0, 0x3f	; 63
+    7938:	f8 94       	cli
+    793a:	fa 9a       	sbi	0x1f, 2	; 31
+    793c:	f9 9a       	sbi	0x1f, 1	; 31
+    793e:	0f be       	out	0x3f, r0	; 63
+    7940:	9c 01       	movw	r18, r24
+			       uint16_t address, pagelen_t len)
+{
+    switch (memtype) {
+    case 'E': // EEPROM
+#if defined(SUPPORT_EEPROM) || defined(BIGBOOT)
+        while(len--) {
+    7942:	0e 17       	cp	r16, r30
+    7944:	71 f7       	brne	.-36     	; 0x7922 <main+0x122>
+    7946:	54 c0       	rjmp	.+168    	; 0x79f0 <main+0x1f0>
+	     * Start the page erase and wait for it to finish.  There
+	     * used to be code to do this while receiving the data over
+	     * the serial link, but the performance improvement was slight,
+	     * and we needed the space back.
+	     */
+	    __boot_page_erase_short((uint16_t)(void*)address);
+    7948:	f7 01       	movw	r30, r14
+    794a:	b7 be       	out	0x37, r11	; 55
+    794c:	e8 95       	spm
+	    boot_spm_busy_wait();
+    794e:	07 b6       	in	r0, 0x37	; 55
+    7950:	00 fc       	sbrc	r0, 0
+    7952:	fd cf       	rjmp	.-6      	; 0x794e <main+0x14e>
+    7954:	a7 01       	movw	r20, r14
+    7956:	a0 e0       	ldi	r26, 0x00	; 0
+    7958:	b1 e0       	ldi	r27, 0x01	; 1
+	    /*
+	     * Copy data from the buffer into the flash write buffer.
+	     */
+	    do {
+		uint16_t a;
+		a = *bufPtr++;
+    795a:	2c 91       	ld	r18, X
+    795c:	30 e0       	ldi	r19, 0x00	; 0
+		a |= (*bufPtr++) << 8;
+    795e:	11 96       	adiw	r26, 0x01	; 1
+    7960:	8c 91       	ld	r24, X
+    7962:	11 97       	sbiw	r26, 0x01	; 1
+    7964:	90 e0       	ldi	r25, 0x00	; 0
+    7966:	98 2f       	mov	r25, r24
+    7968:	88 27       	eor	r24, r24
+    796a:	82 2b       	or	r24, r18
+    796c:	93 2b       	or	r25, r19
+#else
+void CheckFlashImage() {}
+#endif
+
+/* main program starts here */
+int main(void) {
+    796e:	12 96       	adiw	r26, 0x02	; 2
+	     */
+	    do {
+		uint16_t a;
+		a = *bufPtr++;
+		a |= (*bufPtr++) << 8;
+		__boot_page_fill_short((uint16_t)(void*)addrPtr,a);
+    7970:	fa 01       	movw	r30, r20
+    7972:	0c 01       	movw	r0, r24
+    7974:	a7 be       	out	0x37, r10	; 55
+    7976:	e8 95       	spm
+    7978:	11 24       	eor	r1, r1
+		addrPtr += 2;
+    797a:	4e 5f       	subi	r20, 0xFE	; 254
+    797c:	5f 4f       	sbci	r21, 0xFF	; 255
+	    } while (len -= 2);
+    797e:	0a 17       	cp	r16, r26
+    7980:	61 f7       	brne	.-40     	; 0x795a <main+0x15a>
+
+	    /*
+	     * Actually Write the buffer to flash (and wait for it to finish.)
+	     */
+	    __boot_page_write_short((uint16_t)(void*)address);
+    7982:	f7 01       	movw	r30, r14
+    7984:	d7 be       	out	0x37, r13	; 55
+    7986:	e8 95       	spm
+	    boot_spm_busy_wait();
+    7988:	07 b6       	in	r0, 0x37	; 55
+    798a:	00 fc       	sbrc	r0, 0
+    798c:	fd cf       	rjmp	.-6      	; 0x7988 <main+0x188>
+#if defined(RWWSRE)
+	    // Reenable read access to flash
+	    boot_rww_enable();
+    798e:	c7 be       	out	0x37, r12	; 55
+    7990:	e8 95       	spm
+    7992:	2e c0       	rjmp	.+92     	; 0x79f0 <main+0x1f0>
+      writebuffer(desttype, buff, address, savelength);
+
+
+    }
+    /* Read memory block mode, length is big endian.  */
+    else if(ch == STK_READ_PAGE) {
+    7994:	84 37       	cpi	r24, 0x74	; 116
+    7996:	f1 f4       	brne	.+60     	; 0x79d4 <main+0x1d4>
+      uint8_t desttype;
+      GETLENGTH(length);
+    7998:	fb d0       	rcall	.+502    	; 0x7b90 <getch>
+    799a:	fa d0       	rcall	.+500    	; 0x7b90 <getch>
+    799c:	08 2f       	mov	r16, r24
+
+      desttype = getch();
+    799e:	f8 d0       	rcall	.+496    	; 0x7b90 <getch>
+    79a0:	18 2f       	mov	r17, r24
+
+      verifySpace();
+    79a2:	08 d1       	rcall	.+528    	; 0x7bb4 <verifySpace>
+
+static inline void read_mem(uint8_t memtype, uint16_t address, pagelen_t length)
+{
+    uint8_t ch;
+
+    switch (memtype) {
+    79a4:	15 34       	cpi	r17, 0x45	; 69
+    79a6:	71 f4       	brne	.+28     	; 0x79c4 <main+0x1c4>
+    79a8:	c7 01       	movw	r24, r14
+
+#if defined(SUPPORT_EEPROM) || defined(BIGBOOT)
+    case 'E': // EEPROM
+	do {
+	    putch(eeprom_read_byte((uint8_t *)(address++)));
+    79aa:	ec 01       	movw	r28, r24
+    79ac:	21 96       	adiw	r28, 0x01	; 1
+/** \ingroup avr_eeprom
+    Read one byte from EEPROM address \a __p.
+ */
+__ATTR_PURE__ static __inline__ uint8_t eeprom_read_byte (const uint8_t *__p)
+{
+    do {} while (!eeprom_is_ready ());
+    79ae:	f9 99       	sbic	0x1f, 1	; 31
+    79b0:	fe cf       	rjmp	.-4      	; 0x79ae <main+0x1ae>
+#if E2END <= 0xFF
+    EEARL = (uint8_t)(uint16_t)__p;
+#else
+    EEAR = (uint16_t)__p;
+    79b2:	92 bd       	out	0x22, r25	; 34
+    79b4:	81 bd       	out	0x21, r24	; 33
+    /* Use inline assembly below as some AVRs have problems with accessing
+    EECR with STS instructions. For example, see errata for ATmega64. 
+    The code below also assumes that EECR and EEDR are in the I/O space.
+    */
+    uint8_t __result;
+    __asm__ __volatile__
+    79b6:	f8 9a       	sbi	0x1f, 0	; 31
+    79b8:	80 b5       	in	r24, 0x20	; 32
+    79ba:	7b d0       	rcall	.+246    	; 0x7ab2 <putch>
+	} while (--length);
+    79bc:	01 50       	subi	r16, 0x01	; 1
+    79be:	c1 f0       	breq	.+48     	; 0x79f0 <main+0x1f0>
+    79c0:	ce 01       	movw	r24, r28
+    79c2:	f3 cf       	rjmp	.-26     	; 0x79aa <main+0x1aa>
+    79c4:	e7 01       	movw	r28, r14
+	    __asm__ ("elpm %0,Z+\n" : "=r" (ch), "=z" (address): "1" (address));
+#else
+	    // read a Flash byte and increment the address
+	    __asm__ ("lpm %0,Z+\n" : "=r" (ch), "=z" (address): "1" (address));
+#endif
+	    putch(ch);
+    79c6:	fe 01       	movw	r30, r28
+    79c8:	85 91       	lpm	r24, Z+
+    79ca:	ef 01       	movw	r28, r30
+    79cc:	72 d0       	rcall	.+228    	; 0x7ab2 <putch>
+	} while (--length);
+    79ce:	01 50       	subi	r16, 0x01	; 1
+    79d0:	d1 f7       	brne	.-12     	; 0x79c6 <main+0x1c6>
+    79d2:	0e c0       	rjmp	.+28     	; 0x79f0 <main+0x1f0>
+	  
+      read_mem(desttype, address, length);
+    }
+
+    /* Get device signature bytes  */
+    else if(ch == STK_READ_SIGN) {
+    79d4:	85 37       	cpi	r24, 0x75	; 117
+    79d6:	39 f4       	brne	.+14     	; 0x79e6 <main+0x1e6>
+      // READ SIGN - return what Avrdude wants to hear
+      verifySpace();
+    79d8:	ed d0       	rcall	.+474    	; 0x7bb4 <verifySpace>
+      putch(SIGNATURE_0);
+    79da:	8e e1       	ldi	r24, 0x1E	; 30
+    79dc:	6a d0       	rcall	.+212    	; 0x7ab2 <putch>
+      putch(SIGNATURE_1);
+    79de:	85 e9       	ldi	r24, 0x95	; 149
+    79e0:	68 d0       	rcall	.+208    	; 0x7ab2 <putch>
+      putch(SIGNATURE_2);
+    79e2:	8f e0       	ldi	r24, 0x0F	; 15
+    79e4:	67 cf       	rjmp	.-306    	; 0x78b4 <main+0xb4>
+    }
+    else if (ch == STK_LEAVE_PROGMODE) { /* 'Q' */
+    79e6:	81 35       	cpi	r24, 0x51	; 81
+    79e8:	11 f4       	brne	.+4      	; 0x79ee <main+0x1ee>
+      // Adaboot no-wait mod
+      watchdogConfig(WATCHDOG_16MS);
+    79ea:	88 e0       	ldi	r24, 0x08	; 8
+    79ec:	dd d0       	rcall	.+442    	; 0x7ba8 <watchdogConfig>
+      verifySpace();
+    }
+    else {
+      // This covers the response to commands like STK_ENTER_PROGMODE
+      verifySpace();
+    79ee:	e2 d0       	rcall	.+452    	; 0x7bb4 <verifySpace>
+    }
+    putch(STK_OK);
+    79f0:	80 e1       	ldi	r24, 0x10	; 16
+    79f2:	5f d0       	rcall	.+190    	; 0x7ab2 <putch>
+    79f4:	50 cf       	rjmp	.-352    	; 0x7896 <main+0x96>
+
+000079f6 <SPI_transfer>:
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    79f6:	8e bd       	out	0x2e, r24	; 46
+  while (!(SPSR & _BV(SPIF)));
+    79f8:	0d b4       	in	r0, 0x2d	; 45
+    79fa:	07 fe       	sbrs	r0, 7
+    79fc:	fd cf       	rjmp	.-6      	; 0x79f8 <SPI_transfer+0x2>
+  return SPDR;
+    79fe:	8e b5       	in	r24, 0x2e	; 46
+}
+    7a00:	08 95       	ret
+
+00007a02 <FLASH_busy>:
+
+uint8_t FLASH_busy()
+{
+  FLASH_SELECT;
+    7a02:	5d 98       	cbi	0x0b, 5	; 11
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7a04:	85 e0       	ldi	r24, 0x05	; 5
+    7a06:	8e bd       	out	0x2e, r24	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7a08:	0d b4       	in	r0, 0x2d	; 45
+    7a0a:	07 fe       	sbrs	r0, 7
+    7a0c:	fd cf       	rjmp	.-6      	; 0x7a08 <FLASH_busy+0x6>
+  return SPDR;
+    7a0e:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7a10:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7a12:	0d b4       	in	r0, 0x2d	; 45
+    7a14:	07 fe       	sbrs	r0, 7
+    7a16:	fd cf       	rjmp	.-6      	; 0x7a12 <FLASH_busy+0x10>
+  return SPDR;
+    7a18:	8e b5       	in	r24, 0x2e	; 46
+uint8_t FLASH_busy()
+{
+  FLASH_SELECT;
+  SPI_transfer(SPIFLASH_STATUSREAD);
+  uint8_t status = SPI_transfer(0);
+  FLASH_UNSELECT;
+    7a1a:	5d 9a       	sbi	0x0b, 5	; 11
+  return status & 1;
+}
+    7a1c:	81 70       	andi	r24, 0x01	; 1
+    7a1e:	08 95       	ret
+
+00007a20 <FLASH_command>:
+
+void FLASH_command(uint8_t cmd, uint8_t isWrite){
+    7a20:	1f 93       	push	r17
+    7a22:	18 2f       	mov	r17, r24
+  if (isWrite)
+    7a24:	66 23       	and	r22, r22
+    7a26:	21 f0       	breq	.+8      	; 0x7a30 <FLASH_command+0x10>
+  {
+    FLASH_command(SPIFLASH_WRITEENABLE, 0); // Write Enable
+    7a28:	86 e0       	ldi	r24, 0x06	; 6
+    7a2a:	60 e0       	ldi	r22, 0x00	; 0
+    7a2c:	f9 df       	rcall	.-14     	; 0x7a20 <FLASH_command>
+    FLASH_UNSELECT;
+    7a2e:	5d 9a       	sbi	0x0b, 5	; 11
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7a30:	95 e0       	ldi	r25, 0x05	; 5
+  return SPDR;
+}
+
+uint8_t FLASH_busy()
+{
+  FLASH_SELECT;
+    7a32:	5d 98       	cbi	0x0b, 5	; 11
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7a34:	9e bd       	out	0x2e, r25	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7a36:	0d b4       	in	r0, 0x2d	; 45
+    7a38:	07 fe       	sbrs	r0, 7
+    7a3a:	fd cf       	rjmp	.-6      	; 0x7a36 <FLASH_command+0x16>
+  return SPDR;
+    7a3c:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7a3e:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7a40:	0d b4       	in	r0, 0x2d	; 45
+    7a42:	07 fe       	sbrs	r0, 7
+    7a44:	fd cf       	rjmp	.-6      	; 0x7a40 <FLASH_command+0x20>
+  return SPDR;
+    7a46:	8e b5       	in	r24, 0x2e	; 46
+uint8_t FLASH_busy()
+{
+  FLASH_SELECT;
+  SPI_transfer(SPIFLASH_STATUSREAD);
+  uint8_t status = SPI_transfer(0);
+  FLASH_UNSELECT;
+    7a48:	5d 9a       	sbi	0x0b, 5	; 11
+  if (isWrite)
+  {
+    FLASH_command(SPIFLASH_WRITEENABLE, 0); // Write Enable
+    FLASH_UNSELECT;
+  }
+  while(FLASH_busy()); //wait for chip to become available
+    7a4a:	80 fd       	sbrc	r24, 0
+    7a4c:	f2 cf       	rjmp	.-28     	; 0x7a32 <FLASH_command+0x12>
+  FLASH_SELECT;
+    7a4e:	5d 98       	cbi	0x0b, 5	; 11
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7a50:	1e bd       	out	0x2e, r17	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7a52:	0d b4       	in	r0, 0x2d	; 45
+    7a54:	07 fe       	sbrs	r0, 7
+    7a56:	fd cf       	rjmp	.-6      	; 0x7a52 <FLASH_command+0x32>
+  return SPDR;
+    7a58:	8e b5       	in	r24, 0x2e	; 46
+    FLASH_UNSELECT;
+  }
+  while(FLASH_busy()); //wait for chip to become available
+  FLASH_SELECT;
+  SPI_transfer(cmd);
+}
+    7a5a:	1f 91       	pop	r17
+    7a5c:	08 95       	ret
+
+00007a5e <FLASH_readByte>:
+
+uint8_t FLASH_readByte(uint32_t addr) {
+    7a5e:	ef 92       	push	r14
+    7a60:	ff 92       	push	r15
+    7a62:	0f 93       	push	r16
+    7a64:	1f 93       	push	r17
+    7a66:	7b 01       	movw	r14, r22
+    7a68:	8c 01       	movw	r16, r24
+  FLASH_command(SPIFLASH_ARRAYREADLOWFREQ, 0);
+    7a6a:	83 e0       	ldi	r24, 0x03	; 3
+    7a6c:	60 e0       	ldi	r22, 0x00	; 0
+    7a6e:	d8 df       	rcall	.-80     	; 0x7a20 <FLASH_command>
+  SPI_transfer(addr >> 16);
+    7a70:	c8 01       	movw	r24, r16
+    7a72:	aa 27       	eor	r26, r26
+    7a74:	bb 27       	eor	r27, r27
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7a76:	8e bd       	out	0x2e, r24	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7a78:	0d b4       	in	r0, 0x2d	; 45
+    7a7a:	07 fe       	sbrs	r0, 7
+    7a7c:	fd cf       	rjmp	.-6      	; 0x7a78 <FLASH_readByte+0x1a>
+  return SPDR;
+    7a7e:	8e b5       	in	r24, 0x2e	; 46
+}
+
+uint8_t FLASH_readByte(uint32_t addr) {
+  FLASH_command(SPIFLASH_ARRAYREADLOWFREQ, 0);
+  SPI_transfer(addr >> 16);
+  SPI_transfer(addr >> 8);
+    7a80:	bb 27       	eor	r27, r27
+    7a82:	a1 2f       	mov	r26, r17
+    7a84:	90 2f       	mov	r25, r16
+    7a86:	8f 2d       	mov	r24, r15
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7a88:	8e bd       	out	0x2e, r24	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7a8a:	0d b4       	in	r0, 0x2d	; 45
+    7a8c:	07 fe       	sbrs	r0, 7
+    7a8e:	fd cf       	rjmp	.-6      	; 0x7a8a <FLASH_readByte+0x2c>
+  return SPDR;
+    7a90:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7a92:	ee bc       	out	0x2e, r14	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7a94:	0d b4       	in	r0, 0x2d	; 45
+    7a96:	07 fe       	sbrs	r0, 7
+    7a98:	fd cf       	rjmp	.-6      	; 0x7a94 <FLASH_readByte+0x36>
+  return SPDR;
+    7a9a:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7a9c:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7a9e:	0d b4       	in	r0, 0x2d	; 45
+    7aa0:	07 fe       	sbrs	r0, 7
+    7aa2:	fd cf       	rjmp	.-6      	; 0x7a9e <FLASH_readByte+0x40>
+  return SPDR;
+    7aa4:	8e b5       	in	r24, 0x2e	; 46
+  SPI_transfer(addr >> 16);
+  SPI_transfer(addr >> 8);
+  SPI_transfer(addr);
+  //SPI.transfer(0); //"dont care", needed with SPIFLASH_ARRAYREAD command only
+  uint8_t result = SPI_transfer(0);
+  FLASH_UNSELECT;
+    7aa6:	5d 9a       	sbi	0x0b, 5	; 11
+  return result;
+}
+    7aa8:	1f 91       	pop	r17
+    7aaa:	0f 91       	pop	r16
+    7aac:	ff 90       	pop	r15
+    7aae:	ef 90       	pop	r14
+    7ab0:	08 95       	ret
+
+00007ab2 <putch>:
+  putch( '-' );
+  putch( val[(ch & 0x000F)] );
+  putch( '.' );
+}
+#endif
+void putch(char ch) {
+    7ab2:	98 2f       	mov	r25, r24
+#ifndef SOFT_UART
+  while (!(UART_SRA & _BV(UDRE0)));
+    7ab4:	80 91 c0 00 	lds	r24, 0x00C0
+    7ab8:	85 ff       	sbrs	r24, 5
+    7aba:	fc cf       	rjmp	.-8      	; 0x7ab4 <putch+0x2>
+  UART_UDR = ch;
+    7abc:	90 93 c6 00 	sts	0x00C6, r25
+      [uartBit] "I" (UART_TX_BIT)
+    :
+      "r25"
+  );
+#endif
+}
+    7ac0:	08 95       	ret
+
+00007ac2 <putnode>:
+  }
+}
+
+#if 1
+void putnode(int i) {
+     if (i == 0)
+    7ac2:	00 97       	sbiw	r24, 0x00	; 0
+    7ac4:	11 f4       	brne	.+4      	; 0x7aca <putnode+0x8>
+	putch('0');
+    7ac6:	80 e3       	ldi	r24, 0x30	; 48
+    7ac8:	45 c0       	rjmp	.+138    	; 0x7b54 <putnode+0x92>
+  else if (i ==1)
+    7aca:	81 30       	cpi	r24, 0x01	; 1
+    7acc:	91 05       	cpc	r25, r1
+    7ace:	11 f4       	brne	.+4      	; 0x7ad4 <putnode+0x12>
+	putch('1');
+    7ad0:	81 e3       	ldi	r24, 0x31	; 49
+    7ad2:	40 c0       	rjmp	.+128    	; 0x7b54 <putnode+0x92>
+  else if (i ==2)
+    7ad4:	82 30       	cpi	r24, 0x02	; 2
+    7ad6:	91 05       	cpc	r25, r1
+    7ad8:	11 f4       	brne	.+4      	; 0x7ade <putnode+0x1c>
+	putch('2');
+    7ada:	82 e3       	ldi	r24, 0x32	; 50
+    7adc:	3b c0       	rjmp	.+118    	; 0x7b54 <putnode+0x92>
+  else if (i ==3)
+    7ade:	83 30       	cpi	r24, 0x03	; 3
+    7ae0:	91 05       	cpc	r25, r1
+    7ae2:	11 f4       	brne	.+4      	; 0x7ae8 <putnode+0x26>
+	putch('3');
+    7ae4:	83 e3       	ldi	r24, 0x33	; 51
+    7ae6:	36 c0       	rjmp	.+108    	; 0x7b54 <putnode+0x92>
+  else if (i ==4)
+    7ae8:	84 30       	cpi	r24, 0x04	; 4
+    7aea:	91 05       	cpc	r25, r1
+    7aec:	11 f4       	brne	.+4      	; 0x7af2 <putnode+0x30>
+	putch('4');
+    7aee:	84 e3       	ldi	r24, 0x34	; 52
+    7af0:	31 c0       	rjmp	.+98     	; 0x7b54 <putnode+0x92>
+  else if (i ==5)
+    7af2:	85 30       	cpi	r24, 0x05	; 5
+    7af4:	91 05       	cpc	r25, r1
+    7af6:	11 f4       	brne	.+4      	; 0x7afc <putnode+0x3a>
+	putch('5');
+    7af8:	85 e3       	ldi	r24, 0x35	; 53
+    7afa:	2c c0       	rjmp	.+88     	; 0x7b54 <putnode+0x92>
+  else if (i ==6)
+    7afc:	86 30       	cpi	r24, 0x06	; 6
+    7afe:	91 05       	cpc	r25, r1
+    7b00:	11 f4       	brne	.+4      	; 0x7b06 <putnode+0x44>
+	putch('6');
+    7b02:	86 e3       	ldi	r24, 0x36	; 54
+    7b04:	27 c0       	rjmp	.+78     	; 0x7b54 <putnode+0x92>
+  else if (i ==7)
+    7b06:	87 30       	cpi	r24, 0x07	; 7
+    7b08:	91 05       	cpc	r25, r1
+    7b0a:	11 f4       	brne	.+4      	; 0x7b10 <putnode+0x4e>
+	putch('7');
+    7b0c:	87 e3       	ldi	r24, 0x37	; 55
+    7b0e:	22 c0       	rjmp	.+68     	; 0x7b54 <putnode+0x92>
+  else if (i ==8)
+    7b10:	88 30       	cpi	r24, 0x08	; 8
+    7b12:	91 05       	cpc	r25, r1
+    7b14:	11 f4       	brne	.+4      	; 0x7b1a <putnode+0x58>
+	putch('8');
+    7b16:	88 e3       	ldi	r24, 0x38	; 56
+    7b18:	1d c0       	rjmp	.+58     	; 0x7b54 <putnode+0x92>
+  else if (i ==9)
+    7b1a:	89 30       	cpi	r24, 0x09	; 9
+    7b1c:	91 05       	cpc	r25, r1
+    7b1e:	11 f4       	brne	.+4      	; 0x7b24 <putnode+0x62>
+	putch('9');
+    7b20:	89 e3       	ldi	r24, 0x39	; 57
+    7b22:	18 c0       	rjmp	.+48     	; 0x7b54 <putnode+0x92>
+  else if (i ==0xA)
+    7b24:	8a 30       	cpi	r24, 0x0A	; 10
+    7b26:	91 05       	cpc	r25, r1
+    7b28:	11 f4       	brne	.+4      	; 0x7b2e <putnode+0x6c>
+	putch('A');
+    7b2a:	81 e4       	ldi	r24, 0x41	; 65
+    7b2c:	13 c0       	rjmp	.+38     	; 0x7b54 <putnode+0x92>
+  else if (i ==0xB)
+    7b2e:	8b 30       	cpi	r24, 0x0B	; 11
+    7b30:	91 05       	cpc	r25, r1
+    7b32:	11 f4       	brne	.+4      	; 0x7b38 <putnode+0x76>
+	putch('B');
+    7b34:	82 e4       	ldi	r24, 0x42	; 66
+    7b36:	0e c0       	rjmp	.+28     	; 0x7b54 <putnode+0x92>
+  else if (i ==0xC)
+    7b38:	8c 30       	cpi	r24, 0x0C	; 12
+    7b3a:	91 05       	cpc	r25, r1
+    7b3c:	11 f4       	brne	.+4      	; 0x7b42 <putnode+0x80>
+	putch('C');
+    7b3e:	83 e4       	ldi	r24, 0x43	; 67
+    7b40:	09 c0       	rjmp	.+18     	; 0x7b54 <putnode+0x92>
+  else if (i ==0xD)
+    7b42:	8d 30       	cpi	r24, 0x0D	; 13
+    7b44:	91 05       	cpc	r25, r1
+    7b46:	11 f4       	brne	.+4      	; 0x7b4c <putnode+0x8a>
+	putch('D');
+    7b48:	84 e4       	ldi	r24, 0x44	; 68
+    7b4a:	04 c0       	rjmp	.+8      	; 0x7b54 <putnode+0x92>
+  else if (i ==0xE)
+    7b4c:	8e 30       	cpi	r24, 0x0E	; 14
+    7b4e:	91 05       	cpc	r25, r1
+    7b50:	11 f4       	brne	.+4      	; 0x7b56 <putnode+0x94>
+	putch('E');
+    7b52:	85 e4       	ldi	r24, 0x45	; 69
+    7b54:	ae cf       	rjmp	.-164    	; 0x7ab2 <putch>
+  else if (i ==0xF)
+    7b56:	0f 97       	sbiw	r24, 0x0f	; 15
+    7b58:	11 f4       	brne	.+4      	; 0x7b5e <putnode+0x9c>
+	putch('F');
+    7b5a:	86 e4       	ldi	r24, 0x46	; 70
+    7b5c:	aa cf       	rjmp	.-172    	; 0x7ab2 <putch>
+    7b5e:	08 95       	ret
+
+00007b60 <puthex>:
+}
+void puthex(char ch) {
+    7b60:	0f 93       	push	r16
+    7b62:	1f 93       	push	r17
+  putnode((ch & 0x00F0) >> 4);
+    7b64:	08 2f       	mov	r16, r24
+    7b66:	11 27       	eor	r17, r17
+    7b68:	07 fd       	sbrc	r16, 7
+    7b6a:	10 95       	com	r17
+    7b6c:	c8 01       	movw	r24, r16
+    7b6e:	80 7f       	andi	r24, 0xF0	; 240
+    7b70:	90 70       	andi	r25, 0x00	; 0
+    7b72:	24 e0       	ldi	r18, 0x04	; 4
+    7b74:	96 95       	lsr	r25
+    7b76:	87 95       	ror	r24
+    7b78:	2a 95       	dec	r18
+    7b7a:	e1 f7       	brne	.-8      	; 0x7b74 <puthex+0x14>
+    7b7c:	a2 df       	rcall	.-188    	; 0x7ac2 <putnode>
+  putnode((ch & 0x000F));
+    7b7e:	c8 01       	movw	r24, r16
+    7b80:	8f 70       	andi	r24, 0x0F	; 15
+    7b82:	90 70       	andi	r25, 0x00	; 0
+    7b84:	9e df       	rcall	.-196    	; 0x7ac2 <putnode>
+  putch( '.' );
+    7b86:	8e e2       	ldi	r24, 0x2E	; 46
+    7b88:	94 df       	rcall	.-216    	; 0x7ab2 <putch>
+}
+    7b8a:	1f 91       	pop	r17
+    7b8c:	0f 91       	pop	r16
+    7b8e:	08 95       	ret
+
+00007b90 <getch>:
+      [uartBit] "I" (UART_RX_BIT)
+    :
+      "r25"
+);
+#else
+  while(!(UART_SRA & _BV(RXC0)))
+    7b90:	80 91 c0 00 	lds	r24, 0x00C0
+    7b94:	87 ff       	sbrs	r24, 7
+    7b96:	fc cf       	rjmp	.-8      	; 0x7b90 <getch>
+    ;
+  if (!(UART_SRA & _BV(FE0))) {
+    7b98:	80 91 c0 00 	lds	r24, 0x00C0
+    7b9c:	84 fd       	sbrc	r24, 4
+    7b9e:	01 c0       	rjmp	.+2      	; 0x7ba2 <getch+0x12>
+}
+#endif
+
+// Watchdog functions. These are only safe with interrupts turned off.
+void watchdogReset() {
+  __asm__ __volatile__ (
+    7ba0:	a8 95       	wdr
+       * don't care that an invalid char is returned...)
+       */
+    watchdogReset();
+  }
+  
+  ch = UART_UDR;
+    7ba2:	80 91 c6 00 	lds	r24, 0x00C6
+  LED_PIN |= _BV(LED);
+#endif
+#endif
+
+  return ch;
+}
+    7ba6:	08 95       	ret
+
+00007ba8 <watchdogConfig>:
+    "wdr\n"
+  );
+}
+
+void watchdogConfig(uint8_t x) {
+  WDTCSR = _BV(WDCE) | _BV(WDE);
+    7ba8:	e0 e6       	ldi	r30, 0x60	; 96
+    7baa:	f0 e0       	ldi	r31, 0x00	; 0
+    7bac:	98 e1       	ldi	r25, 0x18	; 24
+    7bae:	90 83       	st	Z, r25
+  WDTCSR = x;
+    7bb0:	80 83       	st	Z, r24
+}
+    7bb2:	08 95       	ret
+
+00007bb4 <verifySpace>:
+  do getch(); while (--count);
+  verifySpace();
+}
+
+void verifySpace() {
+  if (getch() != CRC_EOP) {
+    7bb4:	ed df       	rcall	.-38     	; 0x7b90 <getch>
+    7bb6:	80 32       	cpi	r24, 0x20	; 32
+    7bb8:	19 f0       	breq	.+6      	; 0x7bc0 <verifySpace+0xc>
+    watchdogConfig(WATCHDOG_16MS);    // shorten WD timeout
+    7bba:	88 e0       	ldi	r24, 0x08	; 8
+    7bbc:	f5 df       	rcall	.-22     	; 0x7ba8 <watchdogConfig>
+    7bbe:	ff cf       	rjmp	.-2      	; 0x7bbe <verifySpace+0xa>
+    while (1)			      // and busy-loop so that WD causes
+      ;				      //  a reset and app start.
+  }
+  putch(STK_INSYNC);
+    7bc0:	84 e1       	ldi	r24, 0x14	; 20
+}
+    7bc2:	77 cf       	rjmp	.-274    	; 0x7ab2 <putch>
+
+00007bc4 <getNch>:
+    ::[count] "M" (UART_B_VALUE)
+  );
+}
+#endif
+
+void getNch(uint8_t count) {
+    7bc4:	1f 93       	push	r17
+    7bc6:	18 2f       	mov	r17, r24
+  do getch(); while (--count);
+    7bc8:	e3 df       	rcall	.-58     	; 0x7b90 <getch>
+    7bca:	11 50       	subi	r17, 0x01	; 1
+    7bcc:	e9 f7       	brne	.-6      	; 0x7bc8 <getNch+0x4>
+  verifySpace();
+    7bce:	f2 df       	rcall	.-28     	; 0x7bb4 <verifySpace>
+}
+    7bd0:	1f 91       	pop	r17
+    7bd2:	08 95       	ret
+
+00007bd4 <CheckFlashImage>:
+  uint8_t result = SPI_transfer(0);
+  FLASH_UNSELECT;
+  return result;
+}
+
+void CheckFlashImage() {
+    7bd4:	9f 92       	push	r9
+    7bd6:	af 92       	push	r10
+    7bd8:	bf 92       	push	r11
+    7bda:	cf 92       	push	r12
+    7bdc:	df 92       	push	r13
+    7bde:	ef 92       	push	r14
+    7be0:	ff 92       	push	r15
+    7be2:	0f 93       	push	r16
+    7be4:	1f 93       	push	r17
+    7be6:	cf 93       	push	r28
+    7be8:	df 93       	push	r29
+  UCSRA = _BV(U2X); //Double speed mode USART
+  UCSRB = _BV(RXEN) | _BV(TXEN);  // enable Rx & Tx
+  UCSRC = _BV(URSEL) | _BV(UCSZ1) | _BV(UCSZ0);  // config USART; 8N1
+  UBRRL = (uint8_t)( (F_CPU + BAUD_RATE * 4L) / (BAUD_RATE * 8L) - 1 );
+#else
+  UART_SRA = _BV(U2X0); //Double speed mode USART0
+    7bea:	82 e0       	ldi	r24, 0x02	; 2
+    7bec:	80 93 c0 00 	sts	0x00C0, r24
+  UART_SRB = _BV(RXEN0) | _BV(TXEN0);
+    7bf0:	88 e1       	ldi	r24, 0x18	; 24
+    7bf2:	80 93 c1 00 	sts	0x00C1, r24
+  UART_SRC = _BV(UCSZ00) | _BV(UCSZ01);
+    7bf6:	86 e0       	ldi	r24, 0x06	; 6
+    7bf8:	80 93 c2 00 	sts	0x00C2, r24
+  UART_SRL = (uint8_t)( (F_CPU + BAUD_RATE * 4L) / (BAUD_RATE * 8L) - 1 );
+    7bfc:	80 e1       	ldi	r24, 0x10	; 16
+    7bfe:	80 93 c4 00 	sts	0x00C4, r24
+#endif
+#endif
+#endif
+
+#ifdef DEBUG_ON
+  putch('F');
+    7c02:	86 e4       	ldi	r24, 0x46	; 70
+    7c04:	56 df       	rcall	.-340    	; 0x7ab2 <putch>
+#endif
+  watchdogConfig(WATCHDOG_OFF);
+    7c06:	80 e0       	ldi	r24, 0x00	; 0
+    7c08:	cf df       	rcall	.-98     	; 0x7ba8 <watchdogConfig>
+  FLASH_UNSELECT; //unselect FLASH chip
+  PORTB |= _BV(SS); //set SS HIGH
+#endif
+#else	// MINIWIRELESS
+#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) || defined(__AVR_ATmega88) || defined(__AVR_ATmega8__) || defined(__AVR_ATmega88__)
+  DDRB |= _BV(SS) | _BV(PINB3) | _BV(PINB5); //OUTPUTS for SS, MOSI, SCK
+    7c0a:	84 b1       	in	r24, 0x04	; 4
+    7c0c:	8c 62       	ori	r24, 0x2C	; 44
+    7c0e:	84 b9       	out	0x04, r24	; 4
+  DDRD |= _BV(FLASHSS); //OUTPUTS for FLASH_SS
+    7c10:	55 9a       	sbi	0x0a, 5	; 10
+  FLASH_UNSELECT; //unselect FLASH chip
+    7c12:	5d 9a       	sbi	0x0b, 5	; 11
+  PORTB |= _BV(SS); //set SS HIGH
+    7c14:	2a 9a       	sbi	0x05, 2	; 5
+  //SPCR = (SPCR & ~SPI_MODE_MASK) | SPI_MODE0 ; //SPI MODE 0
+  //SPCR = (SPCR & ~SPI_CLOCK_MASK) | (SPI_CLOCK_DIV2 & SPI_CLOCK_MASK); //clock divider = 2
+  //SPSR = (SPSR & ~SPI_2XCLOCK_MASK) | ((SPI_CLOCK_DIV2 >> 2) & SPI_2XCLOCK_MASK);
+
+  // Warning: if the SS pin ever becomes a LOW INPUT then SPI automatically switches to Slave, so the data direction of the SS pin MUST be kept as OUTPUT.
+  SPCR |= _BV(MSTR) | _BV(SPE); //enable SPI and set SPI to MASTER mode
+    7c16:	8c b5       	in	r24, 0x2c	; 44
+    7c18:	80 65       	ori	r24, 0x50	; 80
+    7c1a:	8c bd       	out	0x2c, r24	; 44
+
+  //read first byte of JEDECID, if chip is present it should return a non-0 and non-FF value
+  FLASH_SELECT;
+    7c1c:	5d 98       	cbi	0x0b, 5	; 11
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7c1e:	8f e9       	ldi	r24, 0x9F	; 159
+    7c20:	8e bd       	out	0x2e, r24	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7c22:	0d b4       	in	r0, 0x2d	; 45
+    7c24:	07 fe       	sbrs	r0, 7
+    7c26:	fd cf       	rjmp	.-6      	; 0x7c22 <CheckFlashImage+0x4e>
+  return SPDR;
+    7c28:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7c2a:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7c2c:	0d b4       	in	r0, 0x2d	; 45
+    7c2e:	07 fe       	sbrs	r0, 7
+    7c30:	fd cf       	rjmp	.-6      	; 0x7c2c <CheckFlashImage+0x58>
+  return SPDR;
+    7c32:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7c34:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7c36:	0d b4       	in	r0, 0x2d	; 45
+    7c38:	07 fe       	sbrs	r0, 7
+    7c3a:	fd cf       	rjmp	.-6      	; 0x7c36 <CheckFlashImage+0x62>
+  return SPDR;
+    7c3c:	0e b5       	in	r16, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7c3e:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7c40:	0d b4       	in	r0, 0x2d	; 45
+    7c42:	07 fe       	sbrs	r0, 7
+    7c44:	fd cf       	rjmp	.-6      	; 0x7c40 <CheckFlashImage+0x6c>
+  return SPDR;
+    7c46:	1e b5       	in	r17, 0x2e	; 46
+  FLASH_SELECT;
+  SPI_transfer(SPIFLASH_JEDECID);
+  uint8_t deviceId1 = SPI_transfer(0);
+  uint8_t deviceId2 = SPI_transfer(0);
+  uint8_t deviceId3 = SPI_transfer(0);
+  puthex(deviceId1);
+    7c48:	8b df       	rcall	.-234    	; 0x7b60 <puthex>
+  puthex(deviceId2);
+    7c4a:	80 2f       	mov	r24, r16
+    7c4c:	89 df       	rcall	.-238    	; 0x7b60 <puthex>
+  puthex(deviceId3);
+    7c4e:	81 2f       	mov	r24, r17
+    7c50:	87 df       	rcall	.-242    	; 0x7b60 <puthex>
+  putch('-');  
+    7c52:	8d e2       	ldi	r24, 0x2D	; 45
+    7c54:	2e df       	rcall	.-420    	; 0x7ab2 <putch>
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7c56:	8f e9       	ldi	r24, 0x9F	; 159
+    7c58:	8e bd       	out	0x2e, r24	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7c5a:	0d b4       	in	r0, 0x2d	; 45
+    7c5c:	07 fe       	sbrs	r0, 7
+    7c5e:	fd cf       	rjmp	.-6      	; 0x7c5a <CheckFlashImage+0x86>
+  return SPDR;
+    7c60:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7c62:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7c64:	0d b4       	in	r0, 0x2d	; 45
+    7c66:	07 fe       	sbrs	r0, 7
+    7c68:	fd cf       	rjmp	.-6      	; 0x7c64 <CheckFlashImage+0x90>
+  return SPDR;
+    7c6a:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7c6c:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7c6e:	0d b4       	in	r0, 0x2d	; 45
+    7c70:	07 fe       	sbrs	r0, 7
+    7c72:	fd cf       	rjmp	.-6      	; 0x7c6e <CheckFlashImage+0x9a>
+  return SPDR;
+    7c74:	0e b5       	in	r16, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7c76:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7c78:	0d b4       	in	r0, 0x2d	; 45
+    7c7a:	07 fe       	sbrs	r0, 7
+    7c7c:	fd cf       	rjmp	.-6      	; 0x7c78 <CheckFlashImage+0xa4>
+  return SPDR;
+    7c7e:	1e b5       	in	r17, 0x2e	; 46
+
+  SPI_transfer(SPIFLASH_JEDECID);
+  deviceId1 = SPI_transfer(0);
+  deviceId2 = SPI_transfer(0);
+  deviceId3 = SPI_transfer(0);
+  puthex(deviceId1);
+    7c80:	6f df       	rcall	.-290    	; 0x7b60 <puthex>
+  puthex(deviceId2);
+    7c82:	80 2f       	mov	r24, r16
+    7c84:	6d df       	rcall	.-294    	; 0x7b60 <puthex>
+  puthex(deviceId3);
+    7c86:	81 2f       	mov	r24, r17
+    7c88:	6b df       	rcall	.-298    	; 0x7b60 <puthex>
+  putch('-');  
+    7c8a:	8d e2       	ldi	r24, 0x2D	; 45
+    7c8c:	12 df       	rcall	.-476    	; 0x7ab2 <putch>
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7c8e:	8f e9       	ldi	r24, 0x9F	; 159
+    7c90:	8e bd       	out	0x2e, r24	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7c92:	0d b4       	in	r0, 0x2d	; 45
+    7c94:	07 fe       	sbrs	r0, 7
+    7c96:	fd cf       	rjmp	.-6      	; 0x7c92 <CheckFlashImage+0xbe>
+  return SPDR;
+    7c98:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7c9a:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7c9c:	0d b4       	in	r0, 0x2d	; 45
+    7c9e:	07 fe       	sbrs	r0, 7
+    7ca0:	fd cf       	rjmp	.-6      	; 0x7c9c <CheckFlashImage+0xc8>
+  return SPDR;
+    7ca2:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7ca4:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7ca6:	0d b4       	in	r0, 0x2d	; 45
+    7ca8:	07 fe       	sbrs	r0, 7
+    7caa:	fd cf       	rjmp	.-6      	; 0x7ca6 <CheckFlashImage+0xd2>
+  return SPDR;
+    7cac:	0e b5       	in	r16, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7cae:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7cb0:	0d b4       	in	r0, 0x2d	; 45
+    7cb2:	07 fe       	sbrs	r0, 7
+    7cb4:	fd cf       	rjmp	.-6      	; 0x7cb0 <CheckFlashImage+0xdc>
+  return SPDR;
+    7cb6:	1e b5       	in	r17, 0x2e	; 46
+
+  SPI_transfer(SPIFLASH_JEDECID);
+  deviceId1 = SPI_transfer(0);
+  deviceId2 = SPI_transfer(0);
+  deviceId3 = SPI_transfer(0);
+  puthex(deviceId1);
+    7cb8:	53 df       	rcall	.-346    	; 0x7b60 <puthex>
+  puthex(deviceId2);
+    7cba:	80 2f       	mov	r24, r16
+    7cbc:	51 df       	rcall	.-350    	; 0x7b60 <puthex>
+  puthex(deviceId3);
+    7cbe:	81 2f       	mov	r24, r17
+    7cc0:	4f df       	rcall	.-354    	; 0x7b60 <puthex>
+  FLASH_UNSELECT;
+    7cc2:	5d 9a       	sbi	0x0b, 5	; 11
+  putch('-');  
+    7cc4:	8d e2       	ldi	r24, 0x2D	; 45
+    7cc6:	f5 de       	rcall	.-534    	; 0x7ab2 <putch>
+
+  putch('D');  
+    7cc8:	84 e4       	ldi	r24, 0x44	; 68
+    7cca:	f3 de       	rcall	.-538    	; 0x7ab2 <putch>
+  if (deviceId2 == 0)
+    7ccc:	00 23       	and	r16, r16
+    7cce:	11 f4       	brne	.+4      	; 0x7cd4 <CheckFlashImage+0x100>
+	putch('0');
+    7cd0:	80 e3       	ldi	r24, 0x30	; 48
+    7cd2:	03 c0       	rjmp	.+6      	; 0x7cda <CheckFlashImage+0x106>
+  if (deviceId2 == 0xFF)
+    7cd4:	0f 3f       	cpi	r16, 0xFF	; 255
+    7cd6:	11 f4       	brne	.+4      	; 0x7cdc <CheckFlashImage+0x108>
+    putch('f');
+    7cd8:	86 e6       	ldi	r24, 0x66	; 102
+    7cda:	eb de       	rcall	.-554    	; 0x7ab2 <putch>
+  
+//  if (deviceId2==0 || deviceId2==0xFF) return;
+  
+  putch('c');
+    7cdc:	83 e6       	ldi	r24, 0x63	; 99
+    7cde:	e9 de       	rcall	.-558    	; 0x7ab2 <putch>
+  
+  //global unprotect  
+  FLASH_command(SPIFLASH_STATUSWRITE, 1);
+    7ce0:	81 e0       	ldi	r24, 0x01	; 1
+    7ce2:	61 e0       	ldi	r22, 0x01	; 1
+    7ce4:	9d de       	rcall	.-710    	; 0x7a20 <FLASH_command>
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7ce6:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7ce8:	0d b4       	in	r0, 0x2d	; 45
+    7cea:	07 fe       	sbrs	r0, 7
+    7cec:	fd cf       	rjmp	.-6      	; 0x7ce8 <CheckFlashImage+0x114>
+  return SPDR;
+    7cee:	8e b5       	in	r24, 0x2e	; 46
+  putch('c');
+  
+  //global unprotect  
+  FLASH_command(SPIFLASH_STATUSWRITE, 1);
+  SPI_transfer(0);
+  FLASH_UNSELECT;
+    7cf0:	5d 9a       	sbi	0x0b, 5	; 11
+  
+  putch('d');
+    7cf2:	84 e6       	ldi	r24, 0x64	; 100
+    7cf4:	de de       	rcall	.-580    	; 0x7ab2 <putch>
+    7cf6:	ee 24       	eor	r14, r14
+    7cf8:	ff 24       	eor	r15, r15
+    7cfa:	87 01       	movw	r16, r14
+
+  int idx;
+  for (idx = 0; idx< 16; idx++)
+    puthex(FLASH_readByte(idx));
+    7cfc:	c8 01       	movw	r24, r16
+    7cfe:	b7 01       	movw	r22, r14
+    7d00:	ae de       	rcall	.-676    	; 0x7a5e <FLASH_readByte>
+    7d02:	2e df       	rcall	.-420    	; 0x7b60 <puthex>
+    7d04:	08 94       	sec
+    7d06:	e1 1c       	adc	r14, r1
+    7d08:	f1 1c       	adc	r15, r1
+    7d0a:	01 1d       	adc	r16, r1
+    7d0c:	11 1d       	adc	r17, r1
+  FLASH_UNSELECT;
+  
+  putch('d');
+
+  int idx;
+  for (idx = 0; idx< 16; idx++)
+    7d0e:	20 e1       	ldi	r18, 0x10	; 16
+    7d10:	e2 16       	cp	r14, r18
+    7d12:	f1 04       	cpc	r15, r1
+    7d14:	01 05       	cpc	r16, r1
+    7d16:	11 05       	cpc	r17, r1
+    7d18:	89 f7       	brne	.-30     	; 0x7cfc <CheckFlashImage+0x128>
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7d1a:	8f e9       	ldi	r24, 0x9F	; 159
+    7d1c:	8e bd       	out	0x2e, r24	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7d1e:	0d b4       	in	r0, 0x2d	; 45
+    7d20:	07 fe       	sbrs	r0, 7
+    7d22:	fd cf       	rjmp	.-6      	; 0x7d1e <CheckFlashImage+0x14a>
+  return SPDR;
+    7d24:	8e b5       	in	r24, 0x2e	; 46
+  int idx;
+  for (idx = 0; idx< 16; idx++)
+    puthex(FLASH_readByte(idx));
+
+  SPI_transfer(SPIFLASH_JEDECID);
+  putch('-');  
+    7d26:	8d e2       	ldi	r24, 0x2D	; 45
+    7d28:	c4 de       	rcall	.-632    	; 0x7ab2 <putch>
+  putch('-');  
+    7d2a:	8d e2       	ldi	r24, 0x2D	; 45
+    7d2c:	c2 de       	rcall	.-636    	; 0x7ab2 <putch>
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7d2e:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7d30:	0d b4       	in	r0, 0x2d	; 45
+    7d32:	07 fe       	sbrs	r0, 7
+    7d34:	fd cf       	rjmp	.-6      	; 0x7d30 <CheckFlashImage+0x15c>
+  return SPDR;
+    7d36:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7d38:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7d3a:	0d b4       	in	r0, 0x2d	; 45
+    7d3c:	07 fe       	sbrs	r0, 7
+    7d3e:	fd cf       	rjmp	.-6      	; 0x7d3a <CheckFlashImage+0x166>
+  return SPDR;
+    7d40:	0e b5       	in	r16, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7d42:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7d44:	0d b4       	in	r0, 0x2d	; 45
+    7d46:	07 fe       	sbrs	r0, 7
+    7d48:	fd cf       	rjmp	.-6      	; 0x7d44 <CheckFlashImage+0x170>
+  return SPDR;
+    7d4a:	1e b5       	in	r17, 0x2e	; 46
+  putch('-');  
+  putch('-');  
+  deviceId1 = SPI_transfer(0);
+  deviceId2 = SPI_transfer(0);
+  deviceId3 = SPI_transfer(0);
+  puthex(deviceId1);
+    7d4c:	09 df       	rcall	.-494    	; 0x7b60 <puthex>
+  puthex(deviceId2);
+    7d4e:	80 2f       	mov	r24, r16
+    7d50:	07 df       	rcall	.-498    	; 0x7b60 <puthex>
+  puthex(deviceId3);
+    7d52:	81 2f       	mov	r24, r17
+    7d54:	05 df       	rcall	.-502    	; 0x7b60 <puthex>
+  putch('-');  
+    7d56:	8d e2       	ldi	r24, 0x2D	; 45
+    7d58:	ac de       	rcall	.-680    	; 0x7ab2 <putch>
+  putch('-');  
+    7d5a:	8d e2       	ldi	r24, 0x2D	; 45
+    7d5c:	aa de       	rcall	.-684    	; 0x7ab2 <putch>
+	
+  //check if any flash image exists on external FLASH chip
+  if (FLASH_readByte(0)=='F' && FLASH_readByte(1)=='L' && FLASH_readByte(2)=='X' && FLASH_readByte(6)==':' && FLASH_readByte(9)==':')
+    7d5e:	60 e0       	ldi	r22, 0x00	; 0
+    7d60:	70 e0       	ldi	r23, 0x00	; 0
+    7d62:	80 e0       	ldi	r24, 0x00	; 0
+    7d64:	90 e0       	ldi	r25, 0x00	; 0
+    7d66:	7b de       	rcall	.-778    	; 0x7a5e <FLASH_readByte>
+    7d68:	86 34       	cpi	r24, 0x46	; 70
+    7d6a:	09 f0       	breq	.+2      	; 0x7d6e <CheckFlashImage+0x19a>
+    7d6c:	e5 c0       	rjmp	.+458    	; 0x7f38 <CheckFlashImage+0x364>
+    7d6e:	61 e0       	ldi	r22, 0x01	; 1
+    7d70:	70 e0       	ldi	r23, 0x00	; 0
+    7d72:	80 e0       	ldi	r24, 0x00	; 0
+    7d74:	90 e0       	ldi	r25, 0x00	; 0
+    7d76:	73 de       	rcall	.-794    	; 0x7a5e <FLASH_readByte>
+    7d78:	8c 34       	cpi	r24, 0x4C	; 76
+    7d7a:	09 f0       	breq	.+2      	; 0x7d7e <CheckFlashImage+0x1aa>
+    7d7c:	dd c0       	rjmp	.+442    	; 0x7f38 <CheckFlashImage+0x364>
+    7d7e:	62 e0       	ldi	r22, 0x02	; 2
+    7d80:	70 e0       	ldi	r23, 0x00	; 0
+    7d82:	80 e0       	ldi	r24, 0x00	; 0
+    7d84:	90 e0       	ldi	r25, 0x00	; 0
+    7d86:	6b de       	rcall	.-810    	; 0x7a5e <FLASH_readByte>
+    7d88:	88 35       	cpi	r24, 0x58	; 88
+    7d8a:	09 f0       	breq	.+2      	; 0x7d8e <CheckFlashImage+0x1ba>
+    7d8c:	d5 c0       	rjmp	.+426    	; 0x7f38 <CheckFlashImage+0x364>
+    7d8e:	66 e0       	ldi	r22, 0x06	; 6
+    7d90:	70 e0       	ldi	r23, 0x00	; 0
+    7d92:	80 e0       	ldi	r24, 0x00	; 0
+    7d94:	90 e0       	ldi	r25, 0x00	; 0
+    7d96:	63 de       	rcall	.-826    	; 0x7a5e <FLASH_readByte>
+    7d98:	8a 33       	cpi	r24, 0x3A	; 58
+    7d9a:	09 f0       	breq	.+2      	; 0x7d9e <CheckFlashImage+0x1ca>
+    7d9c:	cd c0       	rjmp	.+410    	; 0x7f38 <CheckFlashImage+0x364>
+    7d9e:	69 e0       	ldi	r22, 0x09	; 9
+    7da0:	70 e0       	ldi	r23, 0x00	; 0
+    7da2:	80 e0       	ldi	r24, 0x00	; 0
+    7da4:	90 e0       	ldi	r25, 0x00	; 0
+    7da6:	5b de       	rcall	.-842    	; 0x7a5e <FLASH_readByte>
+    7da8:	8a 33       	cpi	r24, 0x3A	; 58
+    7daa:	09 f0       	breq	.+2      	; 0x7dae <CheckFlashImage+0x1da>
+    7dac:	c5 c0       	rjmp	.+394    	; 0x7f38 <CheckFlashImage+0x364>
+  {
+#ifdef DEBUG_ON
+    putch('L');
+    7dae:	8c e4       	ldi	r24, 0x4C	; 76
+    7db0:	80 de       	rcall	.-768    	; 0x7ab2 <putch>
+#endif
+    
+    uint16_t imagesize = (FLASH_readByte(7)<<8) | FLASH_readByte(8);
+    7db2:	67 e0       	ldi	r22, 0x07	; 7
+    7db4:	70 e0       	ldi	r23, 0x00	; 0
+    7db6:	80 e0       	ldi	r24, 0x00	; 0
+    7db8:	90 e0       	ldi	r25, 0x00	; 0
+    7dba:	51 de       	rcall	.-862    	; 0x7a5e <FLASH_readByte>
+    7dbc:	08 2f       	mov	r16, r24
+    7dbe:	68 e0       	ldi	r22, 0x08	; 8
+    7dc0:	70 e0       	ldi	r23, 0x00	; 0
+    7dc2:	80 e0       	ldi	r24, 0x00	; 0
+    7dc4:	90 e0       	ldi	r25, 0x00	; 0
+    7dc6:	4b de       	rcall	.-874    	; 0x7a5e <FLASH_readByte>
+    7dc8:	10 e0       	ldi	r17, 0x00	; 0
+    7dca:	d0 2f       	mov	r29, r16
+    7dcc:	cc 27       	eor	r28, r28
+    7dce:	90 e0       	ldi	r25, 0x00	; 0
+    7dd0:	c8 2b       	or	r28, r24
+    7dd2:	d9 2b       	or	r29, r25
+    if (imagesize%2!=0) return; //basic check that we got even # of bytes
+    7dd4:	c0 fd       	sbrc	r28, 0
+    7dd6:	b2 c0       	rjmp	.+356    	; 0x7f3c <CheckFlashImage+0x368>
+    
+    uint16_t b, i, nextAddress=0;
+    
+    LED_PIN |= _BV(LED);
+    7dd8:	19 9a       	sbi	0x03, 1	; 3
+    7dda:	ee 24       	eor	r14, r14
+    7ddc:	ff 24       	eor	r15, r15
+    7dde:	cc 24       	eor	r12, r12
+    7de0:	dd 24       	eor	r13, r13
+#endif
+      
+      //read 2 bytes (16 bits) from flash image, transfer them to page buffer
+      b = FLASH_readByte(i+10); // flash image starts at position 10 on the external flash memory: FLX:XX:FLASH_IMAGE_BYTES_HERE...... (XX = two size bytes)
+      b |= FLASH_readByte(i+11) << 8; //bytes are stored big endian on external flash, need to flip the bytes to little endian for transfer to internal flash
+      __boot_page_fill_short((uint16_t)(void*)i,b);
+    7de2:	99 24       	eor	r9, r9
+    7de4:	93 94       	inc	r9
+
+      //when 1 page is full (or we're on the last page), write it to the internal flash memory
+      if ((i+2)%SPM_PAGESIZE==0 || (i+2==imagesize))
+      {
+        __boot_page_erase_short((uint16_t)(void*)nextAddress); //(i+2-SPM_PAGESIZE)
+    7de6:	73 e0       	ldi	r23, 0x03	; 3
+    7de8:	a7 2e       	mov	r10, r23
+        boot_spm_busy_wait();
+        // Write from programming buffer
+        __boot_page_write_short((uint16_t)(void*)nextAddress ); //(i+2-SPM_PAGESIZE)
+    7dea:	65 e0       	ldi	r22, 0x05	; 5
+    7dec:	b6 2e       	mov	r11, r22
+    7dee:	3d c0       	rjmp	.+122    	; 0x7e6a <CheckFlashImage+0x296>
+    
+    LED_PIN |= _BV(LED);
+    for (i=0; i<imagesize; i+=2)
+    {
+#ifdef DEBUG_ON
+      putch('*');
+    7df0:	8a e2       	ldi	r24, 0x2A	; 42
+    7df2:	5f de       	rcall	.-834    	; 0x7ab2 <putch>
+#endif
+      
+      //read 2 bytes (16 bits) from flash image, transfer them to page buffer
+      b = FLASH_readByte(i+10); // flash image starts at position 10 on the external flash memory: FLX:XX:FLASH_IMAGE_BYTES_HERE...... (XX = two size bytes)
+    7df4:	8a e0       	ldi	r24, 0x0A	; 10
+    7df6:	90 e0       	ldi	r25, 0x00	; 0
+    7df8:	e8 0e       	add	r14, r24
+    7dfa:	f9 1e       	adc	r15, r25
+    7dfc:	b7 01       	movw	r22, r14
+    7dfe:	80 e0       	ldi	r24, 0x00	; 0
+    7e00:	90 e0       	ldi	r25, 0x00	; 0
+    7e02:	2d de       	rcall	.-934    	; 0x7a5e <FLASH_readByte>
+    7e04:	08 2f       	mov	r16, r24
+    7e06:	10 e0       	ldi	r17, 0x00	; 0
+      b |= FLASH_readByte(i+11) << 8; //bytes are stored big endian on external flash, need to flip the bytes to little endian for transfer to internal flash
+    7e08:	08 94       	sec
+    7e0a:	e1 1c       	adc	r14, r1
+    7e0c:	f1 1c       	adc	r15, r1
+    7e0e:	b7 01       	movw	r22, r14
+    7e10:	80 e0       	ldi	r24, 0x00	; 0
+    7e12:	90 e0       	ldi	r25, 0x00	; 0
+    7e14:	a5 ef       	ldi	r26, 0xF5	; 245
+    7e16:	bf ef       	ldi	r27, 0xFF	; 255
+    7e18:	ea 0e       	add	r14, r26
+    7e1a:	fb 1e       	adc	r15, r27
+    7e1c:	20 de       	rcall	.-960    	; 0x7a5e <FLASH_readByte>
+      __boot_page_fill_short((uint16_t)(void*)i,b);
+    7e1e:	90 e0       	ldi	r25, 0x00	; 0
+    7e20:	98 2f       	mov	r25, r24
+    7e22:	88 27       	eor	r24, r24
+    7e24:	80 2b       	or	r24, r16
+    7e26:	91 2b       	or	r25, r17
+    7e28:	f7 01       	movw	r30, r14
+    7e2a:	0c 01       	movw	r0, r24
+    7e2c:	97 be       	out	0x37, r9	; 55
+    7e2e:	e8 95       	spm
+    7e30:	11 24       	eor	r1, r1
+
+      //when 1 page is full (or we're on the last page), write it to the internal flash memory
+      if ((i+2)%SPM_PAGESIZE==0 || (i+2==imagesize))
+    7e32:	22 e0       	ldi	r18, 0x02	; 2
+    7e34:	30 e0       	ldi	r19, 0x00	; 0
+    7e36:	e2 0e       	add	r14, r18
+    7e38:	f3 1e       	adc	r15, r19
+    7e3a:	c7 01       	movw	r24, r14
+    7e3c:	8f 77       	andi	r24, 0x7F	; 127
+    7e3e:	90 70       	andi	r25, 0x00	; 0
+    7e40:	89 2b       	or	r24, r25
+    7e42:	19 f0       	breq	.+6      	; 0x7e4a <CheckFlashImage+0x276>
+    7e44:	ec 16       	cp	r14, r28
+    7e46:	fd 06       	cpc	r15, r29
+    7e48:	81 f4       	brne	.+32     	; 0x7e6a <CheckFlashImage+0x296>
+      {
+        __boot_page_erase_short((uint16_t)(void*)nextAddress); //(i+2-SPM_PAGESIZE)
+    7e4a:	f6 01       	movw	r30, r12
+    7e4c:	a7 be       	out	0x37, r10	; 55
+    7e4e:	e8 95       	spm
+        boot_spm_busy_wait();
+    7e50:	07 b6       	in	r0, 0x37	; 55
+    7e52:	00 fc       	sbrc	r0, 0
+    7e54:	fd cf       	rjmp	.-6      	; 0x7e50 <CheckFlashImage+0x27c>
+        // Write from programming buffer
+        __boot_page_write_short((uint16_t)(void*)nextAddress ); //(i+2-SPM_PAGESIZE)
+    7e56:	f6 01       	movw	r30, r12
+    7e58:	b7 be       	out	0x37, r11	; 55
+    7e5a:	e8 95       	spm
+        boot_spm_busy_wait();
+    7e5c:	07 b6       	in	r0, 0x37	; 55
+    7e5e:	00 fc       	sbrc	r0, 0
+    7e60:	fd cf       	rjmp	.-6      	; 0x7e5c <CheckFlashImage+0x288>
+        nextAddress += SPM_PAGESIZE;
+    7e62:	20 e8       	ldi	r18, 0x80	; 128
+    7e64:	30 e0       	ldi	r19, 0x00	; 0
+    7e66:	c2 0e       	add	r12, r18
+    7e68:	d3 1e       	adc	r13, r19
+    if (imagesize%2!=0) return; //basic check that we got even # of bytes
+    
+    uint16_t b, i, nextAddress=0;
+    
+    LED_PIN |= _BV(LED);
+    for (i=0; i<imagesize; i+=2)
+    7e6a:	ec 16       	cp	r14, r28
+    7e6c:	fd 06       	cpc	r15, r29
+    7e6e:	08 f4       	brcc	.+2      	; 0x7e72 <CheckFlashImage+0x29e>
+    7e70:	bf cf       	rjmp	.-130    	; 0x7df0 <CheckFlashImage+0x21c>
+        __boot_page_write_short((uint16_t)(void*)nextAddress ); //(i+2-SPM_PAGESIZE)
+        boot_spm_busy_wait();
+        nextAddress += SPM_PAGESIZE;
+      }
+    }
+    LED_PIN &= ~_BV(LED);
+    7e72:	19 98       	cbi	0x03, 1	; 3
+
+#if defined(RWWSRE)
+    // Reenable read access to flash
+    boot_rww_enable();
+    7e74:	81 e1       	ldi	r24, 0x11	; 17
+    7e76:	87 bf       	out	0x37, r24	; 55
+    7e78:	e8 95       	spm
+#endif
+      putch('f');
+    7e7a:	86 e6       	ldi	r24, 0x66	; 102
+    7e7c:	1a de       	rcall	.-972    	; 0x7ab2 <putch>
+
+#ifdef DEBUG_ON
+    putch('E');
+    7e7e:	85 e4       	ldi	r24, 0x45	; 69
+    7e80:	18 de       	rcall	.-976    	; 0x7ab2 <putch>
+    7e82:	ee 24       	eor	r14, r14
+    7e84:	ff 24       	eor	r15, r15
+    7e86:	87 01       	movw	r16, r14
+#else
+	// Anarduino doesn't support 32K block erase. Do it, with 8 pages of 4k each
+	int page;
+	long address;
+	for (page = 0, address=0; page< 8; page++) {
+	  FLASH_command(SPIFLASH_BLOCKERASE_4K, 1);
+    7e88:	80 e2       	ldi	r24, 0x20	; 32
+    7e8a:	61 e0       	ldi	r22, 0x01	; 1
+    7e8c:	c9 dd       	rcall	.-1134   	; 0x7a20 <FLASH_command>
+	  SPI_transfer(address >> 16);
+    7e8e:	c8 01       	movw	r24, r16
+    7e90:	bb 27       	eor	r27, r27
+    7e92:	97 fd       	sbrc	r25, 7
+    7e94:	b0 95       	com	r27
+    7e96:	ab 2f       	mov	r26, r27
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7e98:	8e bd       	out	0x2e, r24	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7e9a:	0d b4       	in	r0, 0x2d	; 45
+    7e9c:	07 fe       	sbrs	r0, 7
+    7e9e:	fd cf       	rjmp	.-6      	; 0x7e9a <CheckFlashImage+0x2c6>
+  return SPDR;
+    7ea0:	8e b5       	in	r24, 0x2e	; 46
+	int page;
+	long address;
+	for (page = 0, address=0; page< 8; page++) {
+	  FLASH_command(SPIFLASH_BLOCKERASE_4K, 1);
+	  SPI_transfer(address >> 16);
+	  SPI_transfer(address >> 8);
+    7ea2:	bb 27       	eor	r27, r27
+    7ea4:	17 fd       	sbrc	r17, 7
+    7ea6:	ba 95       	dec	r27
+    7ea8:	a1 2f       	mov	r26, r17
+    7eaa:	90 2f       	mov	r25, r16
+    7eac:	8f 2d       	mov	r24, r15
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7eae:	8e bd       	out	0x2e, r24	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7eb0:	0d b4       	in	r0, 0x2d	; 45
+    7eb2:	07 fe       	sbrs	r0, 7
+    7eb4:	fd cf       	rjmp	.-6      	; 0x7eb0 <CheckFlashImage+0x2dc>
+  return SPDR;
+    7eb6:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7eb8:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7eba:	0d b4       	in	r0, 0x2d	; 45
+    7ebc:	07 fe       	sbrs	r0, 7
+    7ebe:	fd cf       	rjmp	.-6      	; 0x7eba <CheckFlashImage+0x2e6>
+  return SPDR;
+    7ec0:	8e b5       	in	r24, 0x2e	; 46
+    SPI_transfer(0);
+#else
+	// Anarduino doesn't support 32K block erase. Do it, with 8 pages of 4k each
+	int page;
+	long address;
+	for (page = 0, address=0; page< 8; page++) {
+    7ec2:	30 e0       	ldi	r19, 0x00	; 0
+    7ec4:	e3 16       	cp	r14, r19
+    7ec6:	30 e7       	ldi	r19, 0x70	; 112
+    7ec8:	f3 06       	cpc	r15, r19
+    7eca:	30 e0       	ldi	r19, 0x00	; 0
+    7ecc:	03 07       	cpc	r16, r19
+    7ece:	30 e0       	ldi	r19, 0x00	; 0
+    7ed0:	13 07       	cpc	r17, r19
+    7ed2:	49 f0       	breq	.+18     	; 0x7ee6 <CheckFlashImage+0x312>
+	  FLASH_command(SPIFLASH_BLOCKERASE_4K, 1);
+	  SPI_transfer(address >> 16);
+	  SPI_transfer(address >> 8);
+	  SPI_transfer(address);
+	  address += 0x1000;	  
+    7ed4:	80 e0       	ldi	r24, 0x00	; 0
+    7ed6:	90 e1       	ldi	r25, 0x10	; 16
+    7ed8:	a0 e0       	ldi	r26, 0x00	; 0
+    7eda:	b0 e0       	ldi	r27, 0x00	; 0
+    7edc:	e8 0e       	add	r14, r24
+    7ede:	f9 1e       	adc	r15, r25
+    7ee0:	0a 1f       	adc	r16, r26
+    7ee2:	1b 1f       	adc	r17, r27
+    7ee4:	d1 cf       	rjmp	.-94     	; 0x7e88 <CheckFlashImage+0x2b4>
+	}
+#endif
+    FLASH_UNSELECT;
+    7ee6:	5d 9a       	sbi	0x0b, 5	; 11
+    putch('g');
+    7ee8:	87 e6       	ldi	r24, 0x67	; 103
+    7eea:	e3 dd       	rcall	.-1082   	; 0x7ab2 <putch>
+
+#if 1	// invlaidate the first bytes of the flash memory to prevent re-flashing of Atmega chip again
+	FLASH_SELECT;
+    7eec:	5d 98       	cbi	0x0b, 5	; 11
+	FLASH_command(SPIFLASH_BYTEPAGEPROGRAM, 1);
+    7eee:	82 e0       	ldi	r24, 0x02	; 2
+    7ef0:	61 e0       	ldi	r22, 0x01	; 1
+    7ef2:	96 dd       	rcall	.-1236   	; 0x7a20 <FLASH_command>
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7ef4:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7ef6:	0d b4       	in	r0, 0x2d	; 45
+    7ef8:	07 fe       	sbrs	r0, 7
+    7efa:	fd cf       	rjmp	.-6      	; 0x7ef6 <CheckFlashImage+0x322>
+  return SPDR;
+    7efc:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7efe:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7f00:	0d b4       	in	r0, 0x2d	; 45
+    7f02:	07 fe       	sbrs	r0, 7
+    7f04:	fd cf       	rjmp	.-6      	; 0x7f00 <CheckFlashImage+0x32c>
+  return SPDR;
+    7f06:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7f08:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7f0a:	0d b4       	in	r0, 0x2d	; 45
+    7f0c:	07 fe       	sbrs	r0, 7
+    7f0e:	fd cf       	rjmp	.-6      	; 0x7f0a <CheckFlashImage+0x336>
+  return SPDR;
+    7f10:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7f12:	81 e0       	ldi	r24, 0x01	; 1
+    7f14:	8e bd       	out	0x2e, r24	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7f16:	0d b4       	in	r0, 0x2d	; 45
+    7f18:	07 fe       	sbrs	r0, 7
+    7f1a:	fd cf       	rjmp	.-6      	; 0x7f16 <CheckFlashImage+0x342>
+  return SPDR;
+    7f1c:	8e b5       	in	r24, 0x2e	; 46
+
+#define DEBUG_ON                            // uncomment to enable Serial debugging 
+                                              // (will output different characters depending on which path the bootloader takes)
+
+uint8_t SPI_transfer(uint8_t _data) {
+  SPDR = _data;
+    7f1e:	1e bc       	out	0x2e, r1	; 46
+  while (!(SPSR & _BV(SPIF)));
+    7f20:	0d b4       	in	r0, 0x2d	; 45
+    7f22:	07 fe       	sbrs	r0, 7
+    7f24:	fd cf       	rjmp	.-6      	; 0x7f20 <CheckFlashImage+0x34c>
+  return SPDR;
+    7f26:	8e b5       	in	r24, 0x2e	; 46
+    SPI_transfer(0);	// Addr 0 HSB
+    SPI_transfer(0);	// Addr 0 MSB
+    SPI_transfer(0);	// Addr 0 LSB
+	SPI_transfer(1);	// 1 value	
+    SPI_transfer(0);	// Set to 0
+    FLASH_UNSELECT;
+    7f28:	5d 9a       	sbi	0x0b, 5	; 11
+    putch('h');
+    7f2a:	88 e6       	ldi	r24, 0x68	; 104
+    7f2c:	c2 dd       	rcall	.-1148   	; 0x7ab2 <putch>
+#endif
+    
+    //now trigger a watchdog reset
+    watchdogConfig(WATCHDOG_16MS);  // short WDT timeout
+    7f2e:	88 e0       	ldi	r24, 0x08	; 8
+    7f30:	3b de       	rcall	.-906    	; 0x7ba8 <watchdogConfig>
+    putch('i');
+    7f32:	89 e6       	ldi	r24, 0x69	; 105
+    7f34:	be dd       	rcall	.-1156   	; 0x7ab2 <putch>
+    7f36:	ff cf       	rjmp	.-2      	; 0x7f36 <CheckFlashImage+0x362>
+    while (1); 		                  // and busy-loop so that WD causes a reset and app start
+  }
+
+#ifdef DEBUG_ON
+  putch('X');
+    7f38:	88 e5       	ldi	r24, 0x58	; 88
+    7f3a:	bb dd       	rcall	.-1162   	; 0x7ab2 <putch>
+#endif
+}
+    7f3c:	df 91       	pop	r29
+    7f3e:	cf 91       	pop	r28
+    7f40:	1f 91       	pop	r17
+    7f42:	0f 91       	pop	r16
+    7f44:	ff 90       	pop	r15
+    7f46:	ef 90       	pop	r14
+    7f48:	df 90       	pop	r13
+    7f4a:	cf 90       	pop	r12
+    7f4c:	bf 90       	pop	r11
+    7f4e:	af 90       	pop	r10
+    7f50:	9f 90       	pop	r9
+    7f52:	08 95       	ret
+
+00007f54 <appStart>:
+
+void appStart(uint8_t rstFlags) {
+  // save the reset flags in the designated register
+  //  This can be saved in a main program by putting code in .init0 (which
+  //  executes before normal c init code) to save R2 to a global variable.
+  __asm__ __volatile__ ("mov r2, %0\n" :: "r" (rstFlags));
+    7f54:	28 2e       	mov	r2, r24
+
+  watchdogConfig(WATCHDOG_OFF);
+    7f56:	80 e0       	ldi	r24, 0x00	; 0
+    7f58:	27 de       	rcall	.-946    	; 0x7ba8 <watchdogConfig>
+  __asm__ __volatile__ (
+    7f5a:	ee 27       	eor	r30, r30
+    7f5c:	ff 27       	eor	r31, r31
+    7f5e:	09 94       	ijmp

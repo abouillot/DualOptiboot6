@@ -1,0 +1,40 @@
+#
+# Makefile for "custom" platforms.   Add your board here.
+#
+
+
+wildfire: TARGET = $@
+wildfire: CHIP = atmega1284p
+wildfire:
+	$(MAKE) $(CHIP) AVR_FREQ=16000000L LED=B5
+	mv $(PROGRAM)_$(CHIP).hex $(PROGRAM)_$(TARGET).hex
+	mv $(PROGRAM)_$(CHIP).lst $(PROGRAM)_$(TARGET).lst
+
+
+miniwireless: TARGET = miniwireless
+miniwireless: MCU_TARGET = atmega328p
+#LED is on D9 (PORTB1)
+miniwireless: LED = B1 
+miniwireless: CFLAGS += $(COMMON_OPTIONS)
+#FLASHSS is on D5(PIND5)
+miniwireless: CFLAGS += '-DLED=B1' -DBIGBOOT -DFLASHSS=PIND5 -DOPTIBOOT_CUSTOMVER=20
+miniwireless: AVR_FREQ ?= 16000000L
+#miniwireless: LDSECTIONS  = -Wl,--section-start=.text=0x7c00 -Wl,--section-start=.version=0x7ffe
+miniwireless: LDSECTIONS  = -Wl,--section-start=.text=0x7800 -Wl,--section-start=.version=0x7ffe
+miniwireless: $(PROGRAM)_miniwireless.hex
+miniwireless: $(PROGRAM)_miniwireless.lst
+
+miniwireless_isp: miniwireless
+miniwireless_isp: TARGET = miniwireless
+miniwireless_isp: MCU_TARGET = atmega328p
+# 512 byte boot, SPIEN
+#miniwireless_isp: HFUSE ?= DC
+# 1024 byte boot, SPIEN
+#miniwireless_isp: HFUSE ?= DA
+# 2048 byte boot, SPIEN
+miniwireless_isp: HFUSE ?= D8
+# Low power xtal (16MHz) 16KCK/14CK+65ms
+miniwireless_isp: LFUSE ?= FF
+# 2.7V brownout
+miniwireless_isp: EFUSE ?= 05
+miniwireless_isp: isp
