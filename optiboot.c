@@ -404,13 +404,14 @@ void appStart(uint8_t rstFlags) __attribute__ ((naked));
 #ifdef ANARDUINO
   #define FLASHSS_DDR     DDRD
   #define FLASHSS_PORT    PORTD
-    #define FLASHSS         PIND5
+  #define FLASHSS         PIND5
   #define SS              PINB2
 #else
   #define FLASHSS_DDR     DDRB
   #define FLASHSS_PORT    PORTB
   #define FLASHSS         PINB0
   #define SS              PINB2
+#endif
 #elif defined (__AVR_ATmega1284P__) || defined (__AVR_ATmega644P__)
   #define FLASHSS_DDR     DDRC
   #define FLASHSS_PORT    PORTC
@@ -429,6 +430,9 @@ void appStart(uint8_t rstFlags) __attribute__ ((naked));
 #define SPIFLASH_BLOCKERASE_32K   0x52        // erase one 32K block of flash memory
 #define SPIFLASH_BLOCKERASE_64K   0xD8        // erase one 32K block of flash memory
 #define SPIFLASH_JEDECID          0x9F        // read JEDEC ID
+
+#define SPIFLASH_BYTEPAGEPROGRAM  0x02        // write (1 to 256bytes)
+
 #define DEBUG_ON                            // uncomment to enable Serial debugging 
                                               // (will output different characters depending on which path the bootloader takes)
 
@@ -516,7 +520,7 @@ void CheckFlashImage() {
   FLASH_UNSELECT;
 
   // Disabled check, as it only returns 0xFF or 0x00 for some reasons
-  if (deviceId==0 || deviceId==0xFF) return;
+//  if (deviceId2==0 || deviceId2==0xFF) return;
   
   //global unprotect  
   FLASH_command(SPIFLASH_STATUSWRITE, 1);
@@ -578,6 +582,10 @@ void CheckFlashImage() {
 	  SPI_transfer(address >> 16);
 	  SPI_transfer(address >> 8);
 	  SPI_transfer(address);
+	  FLASH_UNSELECT;
+	  
+	  while (FLASH_busy());
+
 	  address += 0x1000;	  
 	}
 #else // MOTEINO
@@ -587,7 +595,9 @@ void CheckFlashImage() {
     SPI_transfer(0);
     SPI_transfer(0);
     SPI_transfer(0);
-    
+#endif
+    FLASH_UNSELECT;
+
     //now trigger a watchdog reset
     watchdogConfig(WATCHDOG_16MS);  // short WDT timeout
     while (1); 		                  // and busy-loop so that WD causes a reset and app start
